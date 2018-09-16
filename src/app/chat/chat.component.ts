@@ -97,7 +97,7 @@ export class ChatComponent implements OnInit, AfterViewInit {
           setTimeout(() => {
             this.reSubscribe();
             this.socketService.sendReconnecting({msg: 'reconnecting'});
-          }, 5000);
+          }, 15000);
         }),
         (() => {
           console.log('completed');
@@ -133,7 +133,7 @@ export class ChatComponent implements OnInit, AfterViewInit {
           setTimeout(() => {
             this.reSubscribe();
             this.socketService.sendReconnecting({msg: 'reconnecting'});
-          }, 5000);
+          }, 15000);
         }),
         (() => {
           console.log('completed');
