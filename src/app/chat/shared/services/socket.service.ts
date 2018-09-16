@@ -3,7 +3,7 @@ import { WebSocketSubject } from 'rxjs/webSocket';
 import { Message, Event } from '../model';
 import { Observable } from 'rxjs';
 
-const SERVER_URL = 'ws://frozen-reaches-54483.herokuapp.com/';
+const SERVER_URL = 'wss://frozen-reaches-54483.herokuapp.com/';
 
 @Injectable({
   providedIn: 'root'
