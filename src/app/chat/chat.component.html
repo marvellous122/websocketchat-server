@@ -27,7 +27,8 @@
       <mat-icon>message</mat-icon>
       <mat-form-field class="chat-input">
         <input matInput 
-               #inputMessage 
+               #inputMessage
+               [disabled]="!connected ? '' : null"
                maxlength="140" 
                placeholder="Type your message" 
                [(ngModel)]="messageContent" 
