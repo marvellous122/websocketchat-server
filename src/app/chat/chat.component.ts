@@ -1,5 +1,6 @@
 import { Component, OnInit, ViewChildren, ViewChild, AfterViewInit, QueryList, ElementRef } from '@angular/core';
 import { MatDialog, MatDialogRef, MatList, MatListItem } from '@angular/material';
+import { ConnectionService } from 'ng-connection-service';
 
 import { Action, Event, Message, User } from './shared/model';
 import { SocketService } from './shared/services/socket.service';
@@ -18,6 +19,7 @@ export class ChatComponent implements OnInit, AfterViewInit {
   action = Action;
   user: User;
   connected = false;
+  browserConnection = true;
   messages: Message[] = [];
   messageContent: string;
   ioConnection: any;
@@ -36,7 +38,9 @@ export class ChatComponent implements OnInit, AfterViewInit {
   // getting a reference to the items/messages within the list
   @ViewChildren(MatListItem, { read: ElementRef }) matListItems: QueryList<MatListItem>;
 
-  constructor(private socketService: SocketService,
+  constructor(
+    private socketService: SocketService,
+    private connectionService: ConnectionService,
     public dialog: MatDialog) { }
 
   ngOnInit() {
@@ -72,50 +76,48 @@ export class ChatComponent implements OnInit, AfterViewInit {
 
   private initIoConnection(): void {
     this.socketService.initWebSocket();
+    this.initBrowserConnectionSubscribe();
     console.log('init');
-    this.ioConnection = this.socketService.onMessage()
-      .subscribe(
-        ((message) => {
-          console.log('receive');
-          if (message.msg === 'connected') {
-            // receive connected status
-            this.socketService.setConnectionStatus(true);
-            this.connected = true;
-            this.messages = message.history;
-          } else if (isArray(message)) {
-            this.messages = this.messages.concat(message);
-          } else {
-            this.messages.push(message);
-          }
-        }),
-        ((err) => {
-          console.log('err', err);
-          // set connection status false
-          this.socketService.setConnectionStatus(false);
-          this.connected = false;
-          // try reconnecting after 5 sec
-          setTimeout(() => {
-            this.reSubscribe();
-            this.socketService.sendReconnecting({msg: 'reconnecting'});
-          }, 15000);
-        }),
-        (() => {
-          console.log('completed');
-        }));
+    this.initSubscribe();
   }
 
-  private reSubscribe(): void {
+  private initConnectionSubscribe(): void {
+    this.socketService.connectedSubscription.subscribe(
+      (connected) => {
+        console.log('--connnection status---', connected);
+      }
+    );
+  }
+
+  private initBrowserConnectionSubscribe(): void {
+    this.connectionService.monitor().subscribe(isConnected => {
+      console.log('browser connection status', isConnected);
+      if (!isConnected) {
+        this.socketService.closeWebSocket();
+      }
+      if (!this.socketService.getBrowserConnectionStatus() && isConnected) {
+        this.initIoConnection();
+      }
+      this.browserConnection = isConnected;
+      this.socketService.setBrowserConnectionStatus(isConnected);
+    });
+  }
+
+  private initSubscribe(): void {
     this.ioConnection = this.socketService.onMessage()
       .subscribe(
         ((message) => {
-          console.log('receive');
-          if (!this.connected) {
+          console.log('receive', message);
+          if (!this.socketService.getConnectionStatus()) {
             this.connected = true;
             this.socketService.setConnectionStatus(true);
             this.messages = message.history;
           }
-          if (message.msg === 'connected') {
-            this.connected = true;
+          if (message.type === 'pong') {
+            this.socketService.setReceivedPingId(message.pingId);
+          } else if (message.msg === 'connected') {
+            console.log('connected');
+            this.messages = message.history;
           } else if (isArray(message)) {
             this.messages = this.messages.concat(message);
           } else {
@@ -125,15 +127,17 @@ export class ChatComponent implements OnInit, AfterViewInit {
         ((err) => {
           console.log('err', err);
           // set connection status false
-          if (this.connected) {
+          if (this.socketService.getConnectionStatus()) {
             this.socketService.setConnectionStatus(false);
             this.connected = false;
           }
           // try reconnecting after 5 sec
-          setTimeout(() => {
-            this.reSubscribe();
-            this.socketService.sendReconnecting({msg: 'reconnecting'});
-          }, 15000);
+          if (this.socketService.getBrowserConnectionStatus()) {
+            setTimeout(() => {
+              this.initSubscribe();
+              this.socketService.sendReconnecting({msg: 'reconnecting'});
+            }, 15000);
+          }
         }),
         (() => {
           console.log('completed');
